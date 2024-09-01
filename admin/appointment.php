@@ -1,24 +1,42 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type");
 
+// Log the request method for debugging
+file_put_contents('php://stderr', print_r($_SERVER['REQUEST_METHOD'], TRUE));
+
+// Set headers for CORS
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+// Use PHPMailer and Exception classes
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
+// Include Composer's autoloader and configuration
 require 'vendor/autoload.php';
 $config = include('config.php');
 
+// Initialize response array
 $response = array();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $data = json_decode(file_get_contents("php://input"), true);
+// Handle preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header('Access-Control-Allow-Methods: POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    http_response_code(200); // Send OK status
+    exit(0);
+}
 
+// Proceed only if request method is POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+
+    // Decode JSON data from the request body
+    $data = json_decode(file_get_contents("php://input"), true);
 
     include('connection.php');
 
-
-    // Extract data
+    // Extract data safely
     $name = isset($data['name']) ? $data['name'] : '';
     $phone = isset($data['phone']) ? $data['phone'] : '';
     $email = isset($data['email']) ? $data['email'] : '';
@@ -26,59 +44,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $service = isset($data['service']) ? $data['service'] : '';
     $message = isset($data['message']) ? $data['message'] : '';
 
-    // Prepare and bind
+    // Prepare and execute database insertion
     $stmt = $conn->prepare("INSERT INTO appointments (name, phone, email, time, service, message) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("ssssss", $name, $phone, $email, $time, $service, $message);
 
-    // Execute the statement
     if ($stmt->execute()) {
-        echo "New appointment created successfully";
+        $response['status'] = 'success';
+        $response['message'] = 'New appointment created successfully';
     } else {
-        echo "Error: " . $stmt->error;
+        $response['status'] = 'error';
+        $response['message'] = 'Error: ' . $stmt->error;
     }
 
-    // Close the statement and connection
+    // Close the statement and database connection
     $stmt->close();
     $conn->close();
 
-    print_r($config['mail']['host']);
-
+    // Send an email with PHPMailer
     $mail = new PHPMailer(true);
 
     try {
         // Server settings
-        $mail->SMTPDebug = 2;
-        $mail->isSMTP();
-        $mail->Host = $config['mail']['host'];
-        $mail->SMTPAuth = $config['mail']['smtp_auth'];
-        $mail->Port = $config['mail']['port'];
-        $mail->SMTPSecure = 'ssl';
-        $mail->Username = $config['mail']['username'];
-        $mail->Password = $config['mail']['password'];
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        $mail->SMTPDebug = 2; // Enable verbose debug output
+        $mail->isSMTP(); // Send using SMTP
+        $mail->Host = $config['mail']['host']; // Set the SMTP server
+        $mail->SMTPAuth = $config['mail']['smtp_auth']; // Enable SMTP authentication
+        $mail->Port = $config['mail']['port']; // Set the SMTP port
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // Enable SSL encryption
+        $mail->Username = $config['mail']['username']; // SMTP username
+        $mail->Password = $config['mail']['password']; // SMTP password
 
         // Recipients
-        $mail->setFrom('floraisondental@alruya.link', 'Floraisondental');
-        $mail->addAddress('hsntkhan1614@gmail.com', 'Floraisondental');
+        $mail->setFrom('floraisondentalinfo@gmail.com', 'Floraisondental');
+        $mail->addAddress('floraisondentalinfo@gmail.com', 'Floraisondental'); // Add a recipient
 
         // Content
-        $mail->isHTML(true);
-        $mail->Subject = 'Contact Form Submission';
-        $mail->Body    = "name: $name<br>phone: $phone<br>email: $email<br>time: $time<br>service: $service<br>message: $message";
+        $mail->isHTML(true); // Set email format to HTML
+        $mail->Subject = 'Appoinment Form Submission';
+        $mail->Body = "Name: $name<br>Phone: $phone<br>Email: $email<br>Time: $time<br>Service: $service<br>Message: $message";
 
+        // Send the email
         $mail->send();
         $response['status'] = 'success';
-        $response['message'] = 'Message has been sent';
-
-        // Return a response
-        echo json_encode(['status' => 'success', 'message' => 'Form submitted successfully']);
+        $response['message'] = 'Form submitted and email sent successfully';
     } catch (Exception $e) {
         $response['status'] = 'error';
         $response['message'] = "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
     }
+
 } else {
+    // Handle invalid request methods
+    header('Content-Type: application/json');
     $response['status'] = 'error';
     $response['message'] = 'Invalid request method';
 }
 
+// Output the JSON response
 echo json_encode($response);
