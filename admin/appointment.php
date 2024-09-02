@@ -20,13 +20,13 @@ $config = include('config.php');
 $response = array();
 
 // Handle preflight OPTIONS request
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    header('Access-Control-Allow-Origin: https://v2.floraisondental.com');
-    header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization');
-    header('Access-Control-Max-Age: 86400'); // Cache for 1 day
-    exit(0);
-}
+// if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+//     header('Access-Control-Allow-Origin: https://v2.floraisondental.com');
+//     header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+//     header('Access-Control-Allow-Headers: Content-Type, Authorization');
+//     header('Access-Control-Max-Age: 86400'); // Cache for 1 day
+//     exit(0);
+// }
 
 // Proceed only if request method is POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
